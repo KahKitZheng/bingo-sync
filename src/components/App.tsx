@@ -1,9 +1,9 @@
-import CreateBingoCardPage from "../pages/CreateBingoCard/CreateBingoCardPage";
+import BingoTemplateEditorPage from "../pages/BingoTemplate/BingoTemplateEditorPage";
 
 function App() {
   return (
-    <main className="p-8 mx-auto">
-      <CreateBingoCardPage />
+    <main className="mx-auto max-w-[1400px] bg-neutral-50 px-4 py-8">
+      <BingoTemplateEditorPage />
     </main>
   );
 }
