@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import FormColumn from "../../components/FormColumn";
 import BingoCard from "../../components/BingoCard";
-import { Trash2 } from "lucide-react";
+import { RefreshCcw, Trash2 } from "lucide-react";
 import Select from "react-select";
 
 type BingoItem = {
@@ -211,26 +211,43 @@ const BingoTemplateEditorPage = () => {
                 menuPortalTarget={document.body}
               />
             </div>
-            <BingoCard
-              grid={bingoItems}
-              gridSize={gridSize}
-              markedCells={markedCells}
-              winningLines={winningLines}
-              onCellClick={(index) => {
-                const newMarkedCells = new Set(markedCells);
-                if (newMarkedCells.has(index)) {
-                  newMarkedCells.delete(index);
-                } else {
-                  newMarkedCells.add(index);
-                }
-                setMarkedCells(newMarkedCells);
+            <div>
+              <div className="flex items-center justify-between">
+                <p className="mb-1 block text-sm font-medium">
+                  Bingo card preview{" "}
+                  <span className="opacity-50">
+                    (items will be randomized once the game starts)
+                  </span>
+                </p>
+                <button
+                  className="cursor-pointer p-2"
+                  onClick={generateBingoCard}
+                  title="Regenerate bingo card"
+                >
+                  <RefreshCcw size={12} />
+                </button>
+              </div>
 
-                // Check for winning lines
-                const markedArray = Array.from(newMarkedCells);
-                const lines = checkWinningLines(markedArray, gridSize);
-                setWinningLines(lines);
-              }}
-            />
+              <BingoCard
+                grid={bingoItems}
+                gridSize={gridSize}
+                markedCells={markedCells}
+                winningLines={winningLines}
+                onCellClick={(index) => {
+                  const newMarkedCells = new Set(markedCells);
+                  if (newMarkedCells.has(index)) {
+                    newMarkedCells.delete(index);
+                  } else {
+                    newMarkedCells.add(index);
+                  }
+                  setMarkedCells(newMarkedCells);
+                  // Check for winning lines
+                  const markedArray = Array.from(newMarkedCells);
+                  const lines = checkWinningLines(markedArray, gridSize);
+                  setWinningLines(lines);
+                }}
+              />
+            </div>
           </div>
         </FormColumn>
 
