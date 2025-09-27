@@ -13,6 +13,11 @@ interface BingoCardProps {
 export function BingoCard(props: BingoCardProps) {
   const { grid, gridSize, markedCells, onCellClick, winningLines = [] } = props;
 
+  const filledGrid = Array.from(
+    { length: gridSize * gridSize },
+    (_, i) => grid[i] || "",
+  );
+
   const isWinningCell = (index: number): boolean => {
     return winningLines.some((line) => line.includes(index));
   };
@@ -22,7 +27,7 @@ export function BingoCard(props: BingoCardProps) {
       className="mx-auto grid aspect-square w-full auto-rows-[minmax(60px,1fr)] gap-2 md:auto-rows-[minmax(100px,1fr)] lg:auto-rows-fr"
       style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
     >
-      {grid.map((item, index) => {
+      {filledGrid.map((item, index) => {
         const isMarked = markedCells.has(index);
         const isFreeSpace = item === "FREE";
         const isWinning = isWinningCell(index);
