@@ -215,7 +215,7 @@ const BingoTemplateEditorPage = () => {
               <div className="flex items-center justify-between">
                 <p className="mb-1 block text-sm font-medium">
                   Bingo card preview{" "}
-                  <span className="opacity-50">
+                  <span className="text-gray-500">
                     (items will be randomized once the game starts)
                   </span>
                 </p>
