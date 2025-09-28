@@ -1,26 +1,116 @@
-export const bingoItems = [
-  { id: 1, text: "English slides", included: false },
-  { id: 2, text: "English at any point", included: false },
-  { id: 3, text: "Awkward silence at the beginning", included: false },
-  { id: 4, text: "Camera point to a wall", included: false },
-  { id: 5, text: "Unmute fail (person talks while muted)", included: false },
-  { id: 6, text: "Technical glitch", included: false },
-  { id: 7, text: "Pet appearance", included: false },
-  { id: 8, text: "4+ turn off webcam", included: false },
-  { id: 9, text: "Max is joining the meeting", included: false },
-  { id: 10, text: "Same slide over 10m", included: false },
-  { id: 11, text: "Question(s) from sales", included: false },
-  { id: 12, text: 'Sales responds to "Can you hear us?"', included: false },
-  { id: 13, text: "Sips of drink", included: false },
-  { id: 14, text: "Someone walks away during the meeting", included: false },
-  { id: 15, text: "A developer laughs", included: false },
-  { id: 16, text: "Slide already explained", included: false },
-  { id: 17, text: "Laptop swap mess", included: false },
-  { id: 18, text: "People are joining late", included: false },
-  { id: 19, text: "Meeting is shorter than 15 minutes", included: false },
-  { id: 20, text: "Word 'quarter' is mentioned 3+ times", included: false },
-  { id: 21, text: "No questions at the end", included: false },
-  { id: 22, text: "Wouter shouts some numbers", included: false },
+import type { BingoItem } from "../types/bingo";
+
+export const mockBingoItems: BingoItem[] = [
+  {
+    id: "n0hV88GXWf",
+    text: "English slides",
+    included: true,
+  },
+  {
+    id: "OXqGqWpuMU",
+    text: "English at any point",
+    included: true,
+  },
+  {
+    id: "x13DvntOO2",
+    text: "Awkward silence at the beginning",
+    included: true,
+  },
+  {
+    id: "CJVhIvTAGl",
+    text: "Camera point to a wall",
+    included: true,
+  },
+  {
+    id: "gloviSM9b3",
+    text: "Unmute fail (person talks while muted)",
+    included: true,
+  },
+  {
+    id: "fEIPCZMKLO",
+    text: "Technical glitch",
+    included: true,
+  },
+  {
+    id: "ZJCDRRR2iQ",
+    text: "Pet appearance",
+    included: true,
+  },
+  {
+    id: "Ji4i7PTx6k",
+    text: "4+ turn off webcam",
+    included: true,
+  },
+  {
+    id: "5pyt0i3WV4",
+    text: "Max is joining the meeting",
+    included: true,
+  },
+  {
+    id: "VUZVP3gaHb",
+    text: "Same slide over 10m",
+    included: true,
+  },
+  {
+    id: "D5Nge2BfI4",
+    text: "Question(s) from sales",
+    included: true,
+  },
+  {
+    id: "hs07X55l2R",
+    text: 'Sales responds to "Can you hear us?"',
+    included: true,
+  },
+  {
+    id: "BPbcbXhCo2",
+    text: "Sips of drink",
+    included: true,
+  },
+  {
+    id: "lGIWPWNyCY",
+    text: "Someone walks away during the meeting",
+    included: true,
+  },
+  {
+    id: "jstBfd81wT",
+    text: "A developer laughs",
+    included: true,
+  },
+  {
+    id: "uAWHs54y9h",
+    text: "Slide already explained",
+    included: true,
+  },
+  {
+    id: "panl7QOybn",
+    text: "Laptop swap mess",
+    included: true,
+  },
+  {
+    id: "sM6oXRkG1F",
+    text: "People are joining late",
+    included: true,
+  },
+  {
+    id: "RzMLwhVr7t",
+    text: "Meeting is shorter than 15 minutes",
+    included: true,
+  },
+  {
+    id: "6GtiHw0jsu",
+    text: "Word 'quarter' is mentioned 3+ times",
+    included: true,
+  },
+  {
+    id: "gND0XvtKWQ",
+    text: "No questions at the end",
+    included: true,
+  },
+  {
+    id: "rlj0fIJ57L",
+    text: "Wouter shouts some numbers",
+    included: true,
+  },
 ];
 
 export const originalBingoItems = [

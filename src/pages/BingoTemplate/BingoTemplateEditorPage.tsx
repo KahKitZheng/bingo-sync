@@ -1,42 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import FormColumn from "../../components/FormColumn";
 import BingoCard from "../../components/BingoCard";
-import { RefreshCcw, Trash2 } from "lucide-react";
 import Select from "react-select";
-
-type BingoItem = {
-  id: string;
-  text: string;
-  included: boolean;
-};
-
-const mockData: BingoItem[] = [
-  { id: "1", text: "English slides", included: true },
-  { id: "2", text: "English at any point", included: true },
-  { id: "3", text: "Awkward silence at the beginning", included: true },
-  { id: "4", text: "Camera point to a wall", included: true },
-  { id: "5", text: "Unmute fail (person talks while muted)", included: true },
-  { id: "6", text: "Technical glitch", included: true },
-  { id: "7", text: "Pet appearance", included: true },
-  { id: "8", text: "4+ turn off webcam", included: true },
-  { id: "9", text: "Max is joining the meeting", included: true },
-  { id: "10", text: "Same slide over 10m", included: true },
-  { id: "11", text: "Question(s) from sales", included: true },
-  { id: "12", text: 'Sales responds to "Can you hear us?"', included: true },
-  { id: "13", text: "Sips of drink", included: true },
-  { id: "14", text: "Someone walks away during the meeting", included: true },
-  { id: "15", text: "A developer laughs", included: true },
-  { id: "16", text: "Slide already explained", included: true },
-  { id: "17", text: "Laptop swap mess", included: true },
-  { id: "18", text: "People are joining late", included: true },
-  { id: "19", text: "Meeting is shorter than 15 minutes", included: true },
-  { id: "20", text: "Word 'quarter' is mentioned 3+ times", included: true },
-  { id: "21", text: "No questions at the end", included: true },
-  { id: "22", text: "Wouter shouts some numbers", included: true },
-];
+import { RefreshCcw, Trash2 } from "lucide-react";
+import { SupabaseContext } from "../../contexts/Supabase/SupabaseContext";
+import type { BingoItem, Template } from "../../types/bingo";
+import { randomId } from "../../utils";
+import { mockBingoItems } from "../../data/data";
 
 const BingoTemplateEditorPage = () => {
-  const [items, setItems] = useState<BingoItem[]>(mockData);
+  const { supabase } = useContext(SupabaseContext);
+
+  const [items, setItems] = useState<BingoItem[]>(mockBingoItems);
   const [gridSize, setGridSize] = useState(5);
   const [bingoItems, setBingoItems] = useState<string[]>([]);
   const [markedCells, setMarkedCells] = useState<Set<number>>(new Set());
@@ -121,14 +96,32 @@ const BingoTemplateEditorPage = () => {
     if (newItem.trim() && !items.some((item) => item.text === newItem.trim())) {
       setItems([
         ...items,
-        { id: Date.now().toString(), text: newItem.trim(), included: true },
+        { id: randomId(), text: newItem.trim(), included: true },
       ]);
       setNewItem("");
     }
   };
 
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+  const removeItem = (id: string) => {
+    setItems(items.filter((item) => item.id !== id));
+  };
+
+  const saveTemplate = async () => {
+    const payload: Template = {
+      id: randomId(),
+      name: templateName.trim(),
+      size: gridSize,
+      items: items,
+      created_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase.from("Template").upsert([payload]);
+
+    if (error) {
+      console.error("Error saving template:", error);
+    } else {
+      console.log("Template saved successfully:", data);
+    }
   };
 
   useEffect(() => {
@@ -137,9 +130,12 @@ const BingoTemplateEditorPage = () => {
 
   return (
     <div>
-      <h1 className="mb-4 text-4xl font-bold">
-        <span className="text-indigo-500">Bingo</span> card maker
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="mb-4 text-4xl font-bold">
+          <span className="text-indigo-500">Bingo</span> card maker
+        </h1>
+        <button onClick={saveTemplate}>Save</button>
+      </div>
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2">
         <FormColumn
           title="Your bingo card"
@@ -286,14 +282,14 @@ const BingoTemplateEditorPage = () => {
             <ol className="grid flex-col gap-2 overflow-y-auto lg:grid-cols-2">
               {items.map((item, index) => (
                 <li
-                  key={item.id}
+                  key={`item-${index}`}
                   className="flex justify-between rounded border border-neutral-200 bg-neutral-50 p-2"
                 >
                   <span className="text-xs">
                     {index + 1}. {item.text}
                   </span>
                   <button
-                    onClick={() => removeItem(index)}
+                    onClick={() => removeItem(item.id)}
                     className="text-destructive cursor-pointer p-1 hover:text-red-400"
                   >
                     <Trash2 className="h-3 w-3" />
