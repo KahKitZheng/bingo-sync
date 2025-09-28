@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from "react";
+import Layout from "../../components/Layout";
 import FormColumn from "../../components/FormColumn";
 import BingoCard from "../../components/BingoCard";
 import Select from "react-select";
@@ -6,14 +7,16 @@ import { RefreshCcw, Trash2 } from "lucide-react";
 import { SupabaseContext } from "../../contexts/Supabase/SupabaseContext";
 import type { BingoItem, Template } from "../../types/bingo";
 import { randomId } from "../../utils";
-import { mockBingoItems } from "../../data/data";
+import { useParams } from "react-router";
 
-const BingoTemplateEditorPage = () => {
-  const { supabase } = useContext(SupabaseContext);
+const TemplateEditorPage = () => {
+  const { supabase, templates } = useContext(SupabaseContext);
 
-  const [items, setItems] = useState<BingoItem[]>(mockBingoItems);
+  const { id } = useParams();
+
   const [gridSize, setGridSize] = useState(5);
-  const [bingoItems, setBingoItems] = useState<string[]>([]);
+  const [items, setItems] = useState<BingoItem[]>([]);
+  const [bingoItems, setBingoItems] = useState<BingoItem[]>([]);
   const [markedCells, setMarkedCells] = useState<Set<number>>(new Set());
   const [winningLines, setWinningLines] = useState<number[][]>([]);
   const [templateName, setTemplateName] = useState("");
@@ -76,18 +79,22 @@ const BingoTemplateEditorPage = () => {
     const availableSlots = needsFreeSpace ? cellCount - 1 : cellCount;
 
     const shuffled = [...includedItems].sort(() => Math.random() - 0.5);
-    const selectedItems = shuffled
-      .slice(0, availableSlots)
-      .map((item) => item.text);
+    const selectedItems = shuffled.slice(0, availableSlots);
 
-    if (needsFreeSpace) {
-      const centerIndex = Math.floor(cellCount / 2);
-      selectedItems.splice(centerIndex, 0, "FREE");
+    const centerIndex = Math.floor(cellCount / 2);
+    if (needsFreeSpace && items.length >= centerIndex) {
+      selectedItems.splice(centerIndex, 0, {
+        id: randomId(),
+        text: "FREE",
+        included: true,
+      });
     }
 
     setBingoItems(selectedItems);
     setMarkedCells(
-      needsFreeSpace ? new Set([Math.floor(cellCount / 2)]) : new Set(),
+      needsFreeSpace && items.length >= centerIndex
+        ? new Set([Math.floor(cellCount / 2)])
+        : new Set(),
     );
     setWinningLines([]);
   }, [gridSize, items]);
@@ -107,12 +114,16 @@ const BingoTemplateEditorPage = () => {
   };
 
   const saveTemplate = async () => {
+    const template = templates.find(
+      (template) => template.id === parseInt(id ?? "-1"),
+    );
+
     const payload: Template = {
-      id: randomId(),
+      id: template?.id ?? templates.length + 1,
       name: templateName.trim(),
       size: gridSize,
       items: items,
-      created_at: new Date().toISOString(),
+      created_at: template?.created_at ?? new Date().toISOString(),
     };
 
     const { data, error } = await supabase.from("Template").upsert([payload]);
@@ -121,6 +132,7 @@ const BingoTemplateEditorPage = () => {
       console.error("Error saving template:", error);
     } else {
       console.log("Template saved successfully:", data);
+      // should probably update context state too
     }
   };
 
@@ -128,14 +140,19 @@ const BingoTemplateEditorPage = () => {
     generateBingoCard();
   }, [generateBingoCard]);
 
+  useEffect(() => {
+    const template = templates.find(
+      (template) => template.id === parseInt(id ?? "-1"),
+    );
+
+    setTemplateName(template?.name || "");
+    setGridSize(template?.size || 5);
+    setItems(template?.items || []);
+  }, [gridSize, id, templates]);
+
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <h1 className="mb-4 text-4xl font-bold">
-          <span className="text-indigo-500">Bingo</span> card maker
-        </h1>
-        <button onClick={saveTemplate}>Save</button>
-      </div>
+    <Layout>
+      <button onClick={saveTemplate}>Save</button>
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2">
         <FormColumn
           title="Your bingo card"
@@ -151,7 +168,7 @@ const BingoTemplateEditorPage = () => {
               </label>
               <input
                 id="bingo-card-name"
-                className="w-full rounded border border-gray-200 p-2 placeholder:text-sm"
+                className="w-full rounded border border-gray-200 p-2 text-sm placeholder:text-sm"
                 type="text"
                 placeholder="Enter a name for your bingo card"
                 value={templateName}
@@ -300,8 +317,8 @@ const BingoTemplateEditorPage = () => {
           </div>
         </FormColumn>
       </div>
-    </div>
+    </Layout>
   );
 };
 
-export default BingoTemplateEditorPage;
+export default TemplateEditorPage;

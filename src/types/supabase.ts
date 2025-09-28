@@ -47,7 +47,7 @@ export type Database = {
           id: number;
           name: string | null;
           start_time: string | null;
-          templateId: string | null;
+          templateId: number | null;
         };
         Insert: {
           created_at?: string;
@@ -56,7 +56,7 @@ export type Database = {
           id?: number;
           name?: string | null;
           start_time?: string | null;
-          templateId?: string | null;
+          templateId?: number | null;
         };
         Update: {
           created_at?: string;
@@ -65,7 +65,7 @@ export type Database = {
           id?: number;
           name?: string | null;
           start_time?: string | null;
-          templateId?: string | null;
+          templateId?: number | null;
         };
         Relationships: [
           {
@@ -81,7 +81,7 @@ export type Database = {
         Row: {
           created_at: string;
           description: string | null;
-          id: string;
+          id: number;
           items: Json | null;
           name: string | null;
           size: number | null;
@@ -89,7 +89,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           description?: string | null;
-          id?: string;
+          id?: number;
           items?: Json | null;
           name?: string | null;
           size?: number | null;
@@ -97,7 +97,7 @@ export type Database = {
         Update: {
           created_at?: string;
           description?: string | null;
-          id?: string;
+          id?: number;
           items?: Json | null;
           name?: string | null;
           size?: number | null;

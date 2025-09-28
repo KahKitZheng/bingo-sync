@@ -1,14 +1,13 @@
-"use client";
-
+import type { BingoItem } from "../types/bingo";
 import { cn } from "../utils";
 
-interface BingoCardProps {
-  grid: string[];
+type BingoCardProps = {
+  grid: BingoItem[];
   gridSize: number;
-  markedCells: Set<number>;
-  onCellClick: (index: number) => void;
+  markedCells?: Set<number>;
+  onCellClick?: (index: number) => void;
   winningLines?: number[][];
-}
+};
 
 export function BingoCard(props: BingoCardProps) {
   const { grid, gridSize, markedCells, onCellClick, winningLines = [] } = props;
@@ -28,14 +27,14 @@ export function BingoCard(props: BingoCardProps) {
       style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
     >
       {filledGrid.map((item, index) => {
-        const isMarked = markedCells.has(index);
-        const isFreeSpace = item === "FREE";
+        const isMarked = markedCells?.has(index);
+        const isFreeSpace = item.text === "FREE";
         const isWinning = isWinningCell(index);
 
         return (
           <button
             key={index}
-            onClick={() => onCellClick(index)}
+            onClick={() => onCellClick?.(index)}
             className={cn(
               "relative flex items-center justify-center rounded-lg border-2 p-2 text-center text-[8px] font-medium transition-all duration-200 hover:scale-105 sm:text-xs",
               isMarked
@@ -61,7 +60,7 @@ export function BingoCard(props: BingoCardProps) {
                 isWinning && "font-bold",
               )}
             >
-              {isMarked ? <s>{item}</s> : item}
+              {isMarked ? <s>{item.text}</s> : item.text}
             </span>
           </button>
         );
