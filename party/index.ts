@@ -1,22 +1,54 @@
 import type * as Party from "partykit/server";
+import type { BingoItem } from "../src/types/bingo";
 
-interface Player {
+type Player = {
   id: string;
   name: string;
   isReady: boolean;
   isHost: boolean;
   connection: Party.Connection;
-}
+};
 
-interface RoomState {
+type PlayerGameState = {
+  playerId: string;
+  playerName: string;
+  bingoItems: BingoItem[];
+  markedCells: number[];
+};
+
+type RoomState = {
   roomCode: string;
   roomName: string;
   gridSize: number;
   maxPlayers: number;
   template: string;
+  templateItems: BingoItem[];
   players: Map<string, Player>;
   gameStarted: boolean;
-}
+  playerGameStates: Map<string, PlayerGameState>;
+};
+
+type CreateRoomData = {
+  roomName?: string;
+  gridSize?: number;
+  playerName: string;
+  templateName?: string;
+  templateItems?: BingoItem[];
+};
+
+type JoinRoomData = {
+  playerName: string;
+};
+
+type ToggleReadyData = {
+  playerId: string;
+  isReady: boolean;
+};
+
+type MarkCellData = {
+  cellIndex: number;
+  marked: boolean;
+};
 
 export default class BingoServer implements Party.Server {
   options: Party.ServerOptions = {
@@ -31,12 +63,14 @@ export default class BingoServer implements Party.Server {
     roomName: "",
     gridSize: 5,
     maxPlayers: 8,
-    template: "Office Meeting Bingo",
+    template: "BU Meeting",
+    templateItems: [],
     players: new Map(),
     gameStarted: false,
+    playerGameStates: new Map(),
   };
 
-  onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
+  onConnect(conn: Party.Connection) {
     console.log(`🔌 Player connected: ${conn.id}`);
   }
 
@@ -62,6 +96,14 @@ export default class BingoServer implements Party.Server {
           this.handleStartGame(sender);
           break;
 
+        case "mark-cell":
+          this.handleMarkCell(sender, data);
+          break;
+
+        case "end-game":
+          this.handleEndGame(sender);
+          break;
+
         case "leave-room":
           this.handleLeaveRoom(sender);
           break;
@@ -80,12 +122,13 @@ export default class BingoServer implements Party.Server {
     }
   }
 
-  handleCreateRoom(sender: Party.Connection, data: any) {
+  handleCreateRoom(sender: Party.Connection, data: CreateRoomData) {
     // Initialize room
     this.state.roomCode = this.room.id;
     this.state.roomName = data.roomName || `Room ${this.room.id}`;
     this.state.gridSize = data.gridSize || 5;
-    this.state.template = "Office Meeting Bingo";
+    this.state.template = data.templateName || "BU Meeting";
+    this.state.templateItems = data.templateItems || this.generateBingoItems();
 
     // Add creator as first player and host
     const player: Player = {
@@ -97,10 +140,6 @@ export default class BingoServer implements Party.Server {
     };
 
     this.state.players.set(sender.id, player);
-
-    console.log(
-      `🎉 Room created: ${this.state.roomCode} by ${data.playerName}`,
-    );
 
     // Send confirmation to creator
     sender.send(
@@ -117,7 +156,7 @@ export default class BingoServer implements Party.Server {
     );
   }
 
-  handleJoinRoom(sender: Party.Connection, data: any) {
+  handleJoinRoom(sender: Party.Connection, data: JoinRoomData) {
     // Check if room is full
     if (this.state.players.size >= this.state.maxPlayers) {
       sender.send(
@@ -151,8 +190,6 @@ export default class BingoServer implements Party.Server {
 
     this.state.players.set(sender.id, player);
 
-    console.log(`👋 Player joined: ${data.playerName}`);
-
     // Send confirmation to joining player
     sender.send(
       JSON.stringify({
@@ -176,12 +213,11 @@ export default class BingoServer implements Party.Server {
     });
   }
 
-  handleToggleReady(sender: Party.Connection, data: any) {
+  handleToggleReady(sender: Party.Connection, data: ToggleReadyData) {
     const player = this.state.players.get(sender.id);
     if (!player) return;
 
     player.isReady = data.isReady;
-    console.log(`✓ ${player.name} ready status: ${player.isReady}`);
 
     // Broadcast to all players
     this.broadcast({
@@ -205,7 +241,7 @@ export default class BingoServer implements Party.Server {
 
     // Check if all players are ready
     const allReady = Array.from(this.state.players.values()).every(
-      (p) => p.isReady,
+      (player) => player.isReady,
     );
 
     if (!allReady) {
@@ -219,19 +255,182 @@ export default class BingoServer implements Party.Server {
     }
 
     this.state.gameStarted = true;
-    console.log("🎮 Game starting!");
 
-    // Broadcast game start to all players
+    // Generate bingo cards for each player using template items
+    const baseBingoItems =
+      this.state.templateItems.length > 0
+        ? this.state.templateItems
+        : this.generateBingoItems();
+    const cellCount = this.state.gridSize * this.state.gridSize;
+    const needsFreeSpace = this.state.gridSize % 2 === 1;
+    const centerIndex = Math.floor(cellCount / 2);
+
+    this.state.players.forEach((player) => {
+      // Filter: only included items, exclude FREE
+      const itemsWithoutFree = baseBingoItems.filter(
+        (item) => item.included && item.text !== "FREE",
+      );
+
+      // Ensure we have enough items
+      const itemsNeeded = needsFreeSpace ? cellCount - 1 : cellCount;
+      if (itemsWithoutFree.length < itemsNeeded) {
+        console.error(
+          `Not enough items! Need ${itemsNeeded}, have ${itemsWithoutFree.length}`,
+        );
+      }
+
+      const shuffled = this.shuffleArray([...itemsWithoutFree]);
+
+      let playerItems: BingoItem[];
+      let initialMarkedCells: number[];
+
+      if (needsFreeSpace) {
+        // Take items needed minus one for FREE space
+        const selectedItems = shuffled.slice(0, cellCount - 1);
+        // Insert FREE at center
+        selectedItems.splice(centerIndex, 0, {
+          id: "free",
+          text: "FREE",
+          included: true,
+        });
+        playerItems = selectedItems;
+        initialMarkedCells = [centerIndex]; // Auto-mark FREE space
+      } else {
+        playerItems = shuffled.slice(0, cellCount);
+        initialMarkedCells = [];
+      }
+
+      this.state.playerGameStates.set(player.id, {
+        playerId: player.id,
+        playerName: player.name,
+        bingoItems: playerItems,
+        markedCells: initialMarkedCells,
+      });
+    });
+
+    // Broadcast game start with player states to all players
     this.broadcast({
       type: "game-started",
+      playerStates: Array.from(this.state.playerGameStates.values()),
+    });
+  }
+
+  handleMarkCell(sender: Party.Connection, data: MarkCellData) {
+    const playerState = this.state.playerGameStates.get(sender.id);
+    if (!playerState) return;
+
+    if (data.marked) {
+      if (!playerState.markedCells.includes(data.cellIndex)) {
+        playerState.markedCells.push(data.cellIndex);
+      }
+    } else {
+      playerState.markedCells = playerState.markedCells.filter(
+        (index) => index !== data.cellIndex,
+      );
+    }
+
+    // Broadcast to all players
+    this.broadcast({
+      type: "cell-marked",
+      playerId: sender.id,
+      cellIndex: data.cellIndex,
+      marked: data.marked,
+    });
+  }
+
+  checkWinningLines(markedIndices: number[], gridSize: number): number[][] {
+    const lines: number[][] = [];
+    const markedSet = new Set(markedIndices);
+
+    // Check rows
+    for (let row = 0; row < gridSize; row++) {
+      const rowIndices = Array.from(
+        { length: gridSize },
+        (_, col) => row * gridSize + col,
+      );
+      if (rowIndices.every((index) => markedSet.has(index))) {
+        lines.push(rowIndices);
+      }
+    }
+
+    // Check columns
+    for (let col = 0; col < gridSize; col++) {
+      const colIndices = Array.from(
+        { length: gridSize },
+        (_, row) => row * gridSize + col,
+      );
+      if (colIndices.every((index) => markedSet.has(index))) {
+        lines.push(colIndices);
+      }
+    }
+
+    // Check diagonals
+    const diagonal1 = Array.from(
+      { length: gridSize },
+      (_, i) => i * gridSize + i,
+    );
+    if (diagonal1.every((index) => markedSet.has(index))) {
+      lines.push(diagonal1);
+    }
+
+    const diagonal2 = Array.from(
+      { length: gridSize },
+      (_, i) => i * gridSize + (gridSize - 1 - i),
+    );
+    if (diagonal2.every((index) => markedSet.has(index))) {
+      lines.push(diagonal2);
+    }
+
+    return lines;
+  }
+
+  handleEndGame(sender: Party.Connection) {
+    const player = this.state.players.get(sender.id);
+    if (!player?.isHost) {
+      sender.send(
+        JSON.stringify({
+          type: "error",
+          message: "Only host can end the game",
+        }),
+      );
+      return;
+    }
+
+    // Calculate lines for each player
+    const playerScores: Array<{
+      playerId: string;
+      playerName: string;
+      linesCount: number;
+    }> = [];
+
+    this.state.playerGameStates.forEach((playerState) => {
+      const lines = this.checkWinningLines(
+        playerState.markedCells,
+        this.state.gridSize,
+      );
+      playerScores.push({
+        playerId: playerState.playerId,
+        playerName: playerState.playerName,
+        linesCount: lines.length,
+      });
+    });
+
+    // Find winner (most lines)
+    const winner = playerScores.reduce((prev, current) =>
+      current.linesCount > prev.linesCount ? current : prev,
+    );
+
+    // Broadcast game end to all players
+    this.broadcast({
+      type: "game-ended",
+      winner,
+      playerScores,
     });
   }
 
   handleLeaveRoom(sender: Party.Connection) {
     const player = this.state.players.get(sender.id);
     if (!player) return;
-
-    console.log(`👋 ${player.name} left the room`);
 
     // If host leaves, assign new host
     if (player.isHost && this.state.players.size > 1) {
@@ -252,28 +451,73 @@ export default class BingoServer implements Party.Server {
   }
 
   onClose(connection: Party.Connection) {
-    console.log(`🔌 Player disconnected: ${connection.id}`);
     this.handleLeaveRoom(connection);
   }
 
   // Helper methods
   getPlayersArray() {
-    return Array.from(this.state.players.values()).map((p) => ({
-      id: p.id,
-      name: p.name,
-      isReady: p.isReady,
-      isHost: p.isHost,
+    return Array.from(this.state.players.values()).map((player) => ({
+      id: player.id,
+      name: player.name,
+      isReady: player.isReady,
+      isHost: player.isHost,
     }));
   }
 
-  broadcast(message: any) {
+  generateBingoItems(): BingoItem[] {
+    // Default bingo items - in production, these would come from the selected template
+    const items = [
+      "Someone's mic is on mute",
+      "Can you see my screen?",
+      "Sorry, I was on mute",
+      "Let's take this offline",
+      "Can everyone see the presentation?",
+      "Sorry, you go ahead",
+      "I have a hard stop at...",
+      "Can you hear me?",
+      "Someone joins late",
+      "Technical difficulties",
+      "Background noise",
+      "FREE",
+      "Let's circle back",
+      "Can we get a recording?",
+      "Anyone have questions?",
+      "Is everyone here?",
+      "Let's give it a few minutes",
+      "Can you share that link?",
+      "We're over time",
+      "Child or pet appears",
+      "Connection issues",
+      "Sorry, I was multitasking",
+      "Let's set up a follow-up",
+      "Can you send that in chat?",
+      "We lost you there",
+    ];
+
+    return items.map((text, index) => ({
+      id: `item-${index}`,
+      text,
+      included: true,
+    }));
+  }
+
+  shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  broadcast(message: Record<string, unknown>) {
     const payload = JSON.stringify(message);
     this.state.players.forEach((player) => {
       player.connection.send(payload);
     });
   }
 
-  broadcastToOthers(excludeId: string, message: any) {
+  broadcastToOthers(excludeId: string, message: Record<string, unknown>) {
     const payload = JSON.stringify(message);
     this.state.players.forEach((player) => {
       if (player.id !== excludeId) {

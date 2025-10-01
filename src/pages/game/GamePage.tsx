@@ -1,7 +1,13 @@
-import { useCallback, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import Layout from "../../components/Layout";
 import Select from "react-select";
 import usePartySocket from "partysocket/react";
+import BingoCard from "../../components/BingoCard";
+import GameEndedView from "../../components/game/GameEndedView";
+import GameHeader from "../../components/game/GameHeader";
+import PlayerCardSmall from "../../components/game/PlayerCardSmall";
+import { SupabaseContext } from "../../contexts/Supabase/SupabaseContext";
+import type { BingoItem } from "../../types/bingo";
 
 const host = import.meta.env.PROD
   ? "https://not-a-wordle.kahkitzheng.partykit.dev/"
@@ -17,25 +23,51 @@ const generateRoomCode = () => {
   return code;
 };
 
-interface Player {
+type Player = {
   id: string;
   name: string;
   isReady: boolean;
   isHost: boolean;
-}
+};
 
-interface RoomDetails {
+type RoomDetails = {
   roomCode: string;
   roomName: string;
   template: string;
   gridSize: number;
   maxPlayers: number;
-}
+};
+
+type PlayerGameState = {
+  playerId: string;
+  playerName: string;
+  bingoItems: BingoItem[];
+  markedCells: Set<number>;
+};
+
+type Winner = {
+  playerId: string;
+  playerName: string;
+  linesCount: number;
+};
+
+type PendingAction = {
+  type: "create" | "join";
+  data: {
+    type: string;
+    roomName?: string;
+    gridSize?: number;
+    playerName: string;
+    templateName?: string;
+    templateItems?: BingoItem[];
+    timestamp: number;
+  };
+};
 
 const GamePage = () => {
-  const [gameGridSize, setGameGridSize] = useState(5);
+  const { templates } = useContext(SupabaseContext);
+  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null);
 
   // Create room form
@@ -47,40 +79,108 @@ const GamePage = () => {
   const [joinPlayerName, setJoinPlayerName] = useState("");
 
   // Pending action to send when socket connects
-  const [pendingAction, setPendingAction] = useState<{
-    type: "create" | "join";
-    data: any;
-  } | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(
+    null,
+  );
 
   // Game state
   const [inLobby, setInLobby] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
   const [roomDetails, setRoomDetails] = useState<RoomDetails | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Game play state
+  const [playerStates, setPlayerStates] = useState<
+    Map<string, PlayerGameState>
+  >(new Map());
+  const [winningLines, setWinningLines] = useState<Map<string, number[][]>>(
+    new Map(),
+  );
+  const [gameStartTime, setGameStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [gameEnded, setGameEnded] = useState(false);
+  const [winner, setWinner] = useState<Winner | null>(null);
+
+  // Timer effect
+  useEffect(() => {
+    if (gameStartTime && !gameEnded) {
+      const interval = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - gameStartTime) / 1000));
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [gameStartTime, gameEnded]);
+
+  // Set default template when templates load
+  useEffect(() => {
+    if (templates.length > 0 && selectedTemplate === null) {
+      setSelectedTemplate(templates[0].id);
+    }
+  }, [templates, selectedTemplate]);
+
+  const checkWinningLines = useCallback(
+    (markedIndices: number[], gridSize: number): number[][] => {
+      const lines: number[][] = [];
+      const markedSet = new Set(markedIndices);
+
+      // Check rows
+      for (let row = 0; row < gridSize; row++) {
+        const rowIndices = Array.from(
+          { length: gridSize },
+          (_, col) => row * gridSize + col,
+        );
+        if (rowIndices.every((index) => markedSet.has(index))) {
+          lines.push(rowIndices);
+        }
+      }
+
+      // Check columns
+      for (let col = 0; col < gridSize; col++) {
+        const colIndices = Array.from(
+          { length: gridSize },
+          (_, row) => row * gridSize + col,
+        );
+        if (colIndices.every((index) => markedSet.has(index))) {
+          lines.push(colIndices);
+        }
+      }
+
+      // Check diagonals
+      const diagonal1 = Array.from(
+        { length: gridSize },
+        (_, i) => i * gridSize + i,
+      );
+      if (diagonal1.every((index) => markedSet.has(index))) {
+        lines.push(diagonal1);
+      }
+
+      const diagonal2 = Array.from(
+        { length: gridSize },
+        (_, i) => i * gridSize + (gridSize - 1 - i),
+      );
+      if (diagonal2.every((index) => markedSet.has(index))) {
+        lines.push(diagonal2);
+      }
+
+      return lines;
+    },
+    [],
+  );
 
   const socket = usePartySocket({
     host,
     room: roomId || "test",
     onOpen() {
-      console.log("✅ Connected to room:", roomId);
-      setIsConnected(true);
       setError(null);
 
       // Send pending action if any
       if (pendingAction) {
-        console.log(
-          "📤 Sending pending action:",
-          pendingAction.type,
-          pendingAction.data,
-        );
         socket.send(JSON.stringify(pendingAction.data));
         setPendingAction(null);
       }
     },
-    onClose() {
-      console.log("Disconnected from room");
-      setIsConnected(false);
-    },
+    onClose() {},
     onError(event) {
       console.error("Socket error:", event);
       setError("Connection error. Please try again.");
@@ -92,7 +192,6 @@ const GamePage = () => {
       }
 
       if (event.data === "goaway") {
-        console.log("Good bye.");
         socket.close();
         setError("Disconnected from server.");
         return;
@@ -136,20 +235,98 @@ const GamePage = () => {
             );
             break;
 
-          case "game-started":
-            // Handle game start
-            console.log("Game started!");
+          case "game-started": {
+            setGameStarted(true);
+            setInLobby(false);
+            setGameStartTime(Date.now());
+
+            // Initialize player states from server
+            const newPlayerStates = new Map<string, PlayerGameState>();
+            const newWinningLines = new Map<string, number[][]>();
+
+            message.playerStates.forEach(
+              (state: {
+                playerId: string;
+                playerName: string;
+                bingoItems: BingoItem[];
+                markedCells: number[];
+              }) => {
+                const markedCells = new Set<number>(state.markedCells);
+                newPlayerStates.set(state.playerId, {
+                  playerId: state.playerId,
+                  playerName: state.playerName,
+                  bingoItems: state.bingoItems,
+                  markedCells,
+                });
+
+                // Check initial winning lines (in case FREE is pre-marked)
+                const markedArray = Array.from(markedCells);
+                const lines = checkWinningLines(
+                  markedArray,
+                  roomDetails?.gridSize || 5,
+                );
+                newWinningLines.set(state.playerId, lines);
+              },
+            );
+            setPlayerStates(newPlayerStates);
+            setWinningLines(newWinningLines);
+            break;
+          }
+
+          case "cell-marked": {
+            // Update player states
+            setPlayerStates((prev) => {
+              const newStates = new Map(prev);
+              const playerState = newStates.get(message.playerId);
+              if (!playerState) return prev;
+
+              const newMarkedCells = new Set(playerState.markedCells);
+              if (message.marked) {
+                newMarkedCells.add(message.cellIndex);
+              } else {
+                newMarkedCells.delete(message.cellIndex);
+              }
+
+              const updatedPlayerState = {
+                ...playerState,
+                markedCells: newMarkedCells,
+              };
+              newStates.set(message.playerId, updatedPlayerState);
+
+              // Check for winning lines - use roomDetails.gridSize directly
+              const markedArray = Array.from(newMarkedCells);
+              const lines = checkWinningLines(
+                markedArray,
+                roomDetails!.gridSize,
+              );
+
+              // Update winning lines in a separate state update
+              setWinningLines((prevLines) => {
+                const newLines = new Map(prevLines);
+                newLines.set(message.playerId, lines);
+                return newLines;
+              });
+
+              return newStates;
+            });
+            break;
+          }
+
+          case "game-ended":
+            setGameEnded(true);
+            setWinner(message.winner);
             break;
 
           case "error":
+            console.error("❌ Server error:", message.message);
             setError(message.message || "An error occurred");
             break;
 
           default:
-            console.log("Received message:", message);
+            console.log("⚠️ Unhandled message type:", message.type);
         }
-      } catch (e) {
-        console.log("Non-JSON message:", event.data);
+      } catch {
+        console.log("📝 Non-JSON message:", event.data);
       }
     },
   });
@@ -157,6 +334,17 @@ const GamePage = () => {
   const handleCreateRoom = useCallback(() => {
     if (!createPlayerName.trim()) {
       setError("Please enter your name");
+      return;
+    }
+
+    if (selectedTemplate === null) {
+      setError("Please select a template");
+      return;
+    }
+
+    const template = templates.find((t) => t.id === selectedTemplate);
+    if (!template) {
+      setError("Invalid template selected");
       return;
     }
 
@@ -168,15 +356,17 @@ const GamePage = () => {
       data: {
         type: "create-room",
         roomName: createRoomName || `Room ${newRoomCode}`,
-        gridSize: gameGridSize,
+        gridSize: template.size,
         playerName: createPlayerName,
+        templateName: template.name,
+        templateItems: template.items,
         timestamp: Date.now(),
       },
     });
 
     // This will trigger socket reconnection to new room
     setRoomId(newRoomCode);
-  }, [createPlayerName, createRoomName, gameGridSize]);
+  }, [createPlayerName, createRoomName, selectedTemplate, templates]);
 
   const handleJoinRoom = useCallback(() => {
     if (!joinPlayerName.trim()) {
@@ -231,6 +421,38 @@ const GamePage = () => {
     }
   }, [socket, currentPlayerId, players]);
 
+  const handleEndGame = useCallback(() => {
+    const currentPlayer = players.find((p) => p.id === currentPlayerId);
+    if (currentPlayer?.isHost) {
+      socket.send(
+        JSON.stringify({
+          type: "end-game",
+          timestamp: Date.now(),
+        }),
+      );
+    }
+  }, [socket, currentPlayerId, players]);
+
+  const handleCellClick = useCallback(
+    (cellIndex: number) => {
+      const currentPlayerState = playerStates.get(currentPlayerId || "");
+      if (!currentPlayerState) return;
+
+      const isMarked = currentPlayerState.markedCells.has(cellIndex);
+
+      socket.send(
+        JSON.stringify({
+          type: "mark-cell",
+          playerId: currentPlayerId,
+          cellIndex,
+          marked: !isMarked,
+          timestamp: Date.now(),
+        }),
+      );
+    },
+    [socket, currentPlayerId, playerStates],
+  );
+
   const handleLeaveRoom = useCallback(() => {
     if (socket) {
       socket.send(
@@ -241,13 +463,21 @@ const GamePage = () => {
       );
       socket.close();
     }
+    // Reset all game state
     setRoomId(null);
-    setIsConnected(false);
     setInLobby(false);
+    setGameStarted(false);
+    setGameEnded(false);
+    setWinner(null);
+    setGameStartTime(null);
+    setElapsedTime(0);
     setRoomDetails(null);
     setPlayers([]);
+    setPlayerStates(new Map());
+    setWinningLines(new Map());
     setCurrentPlayerId(null);
     setPendingAction(null);
+    setSelectedTemplate(null);
     setCreateRoomName("");
     setCreatePlayerName("");
     setJoinRoomCode("");
@@ -269,7 +499,100 @@ const GamePage = () => {
   const readyCount = players.filter((p) => p.isReady).length;
   const allReady = players.length > 0 && players.every((p) => p.isReady);
 
-  // If in lobby, show room details
+  // Game ended view
+  if (gameEnded && winner && roomDetails) {
+    return (
+      <GameEndedView
+        winner={winner}
+        elapsedTime={elapsedTime}
+        onLeaveRoom={handleLeaveRoom}
+      />
+    );
+  }
+
+  // Game view - show bingo cards
+  if (gameStarted && roomDetails) {
+    const currentPlayerState = playerStates.get(currentPlayerId || "");
+    const otherPlayerStates = Array.from(playerStates.values()).filter(
+      (state) => state.playerId !== currentPlayerId,
+    );
+    const currentPlayerLines = winningLines.get(currentPlayerId || "") || [];
+
+    return (
+      <Layout>
+        <div className="space-y-4">
+          <GameHeader
+            roomName={roomDetails.roomName}
+            roomCode={roomDetails.roomCode}
+            elapsedTime={elapsedTime}
+            isHost={isHost}
+            onEndGame={handleEndGame}
+            onLeaveRoom={handleLeaveRoom}
+          />
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Current Player's Card */}
+            <div className="space-y-4">
+              <div className="rounded-lg border border-neutral-200 bg-white p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-xl font-semibold">Your Card</h2>
+                  <div className="text-sm">
+                    <span className="font-semibold text-emerald-600">
+                      {currentPlayerLines.length}
+                    </span>{" "}
+                    <span className="text-neutral-500">
+                      {currentPlayerLines.length === 1 ? "line" : "lines"}
+                    </span>
+                  </div>
+                </div>
+                {currentPlayerState && (
+                  <BingoCard
+                    grid={currentPlayerState.bingoItems}
+                    gridSize={roomDetails.gridSize}
+                    markedCells={currentPlayerState.markedCells}
+                    onCellClick={handleCellClick}
+                    winningLines={currentPlayerLines}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Other Players' Cards */}
+            <div className="space-y-4">
+              <div className="rounded-lg border border-neutral-200 bg-white p-6">
+                <h2 className="mb-4 text-xl font-semibold">
+                  Other Players ({otherPlayerStates.length})
+                </h2>
+                <div className="grid grid-cols-2 gap-4">
+                  {otherPlayerStates.map((playerState) => {
+                    const playerLines =
+                      winningLines.get(playerState.playerId) || [];
+                    return (
+                      <PlayerCardSmall
+                        key={playerState.playerId}
+                        playerName={playerState.playerName}
+                        gridSize={roomDetails.gridSize}
+                        bingoItems={playerState.bingoItems}
+                        markedCells={playerState.markedCells}
+                        winningLines={playerLines}
+                      />
+                    );
+                  })}
+                  {otherPlayerStates.length === 0 && (
+                    <p className="col-span-2 text-center text-sm text-neutral-500">
+                      No other players yet
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Lobby view
   if (inLobby && roomDetails) {
     return (
       <Layout>
@@ -507,6 +830,7 @@ const GamePage = () => {
     );
   }
 
+  // Initial view - create or join room
   return (
     <Layout>
       {error && (
@@ -561,18 +885,24 @@ const GamePage = () => {
                   fontSize: "0.875rem",
                 }),
               }}
-              value={{
-                value: gameGridSize,
-                label: `${gameGridSize}x${gameGridSize} (${gameGridSize * gameGridSize} cells)`,
-              }}
-              options={[
-                { value: 3, label: "3x3 (9 cells)" },
-                { value: 4, label: "4x4 (16 cells)" },
-                { value: 5, label: "5x5 (25 cells)" },
-              ]}
+              value={
+                selectedTemplate !== null
+                  ? {
+                      value: selectedTemplate,
+                      label:
+                        templates.find((t) => t.id === selectedTemplate)
+                          ?.name || "Select template",
+                    }
+                  : null
+              }
+              options={templates.map((template) => ({
+                value: template.id,
+                label: `${template.name} (${template.size}x${template.size})`,
+              }))}
               onChange={(option) => {
-                if (option) setGameGridSize(option.value);
+                if (option) setSelectedTemplate(option.value);
               }}
+              placeholder="Select a template"
               isSearchable={false}
               isDisabled={roomId !== null}
               menuPortalTarget={document.body}
@@ -593,7 +923,11 @@ const GamePage = () => {
 
           <button
             onClick={handleCreateRoom}
-            disabled={roomId !== null || !createPlayerName.trim()}
+            disabled={
+              roomId !== null ||
+              !createPlayerName.trim() ||
+              selectedTemplate === null
+            }
             className="w-full rounded bg-black px-4 py-2 text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
           >
             {roomId ? "Creating..." : "Create Room"}

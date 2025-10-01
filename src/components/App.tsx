@@ -1,6 +1,5 @@
 import { SupabaseContextProvider } from "../contexts/Supabase/SupabaseContextProvider";
 import { BrowserRouter, Route, Routes } from "react-router";
-import HomePage from "../pages/HomePage";
 import TemplateEditorPage from "../pages/template/TemplateEditorPage";
 import TemplatesPage from "../pages/template/TemplatesPage";
 import GamePage from "../pages/game/GamePage";
@@ -11,7 +10,7 @@ function App() {
     <BrowserRouter>
       <SupabaseContextProvider>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<GamePage />} />
           <Route path="/templates" element={<TemplatesPage />} />
           <Route path="/template/:id" element={<TemplateEditorPage />} />
           <Route path="/game" element={<GamePage />} />
