@@ -10,7 +10,7 @@ import type { BingoItem } from "../types/bingo";
 import { checkWinningLines } from "../utils";
 
 const host = import.meta.env.PROD
-  ? "https://not-a-wordle.kahkitzheng.partykit.dev/"
+  ? "https://bingo-sync-party.kahkitzheng.partykit.dev"
   : "http://localhost:1999";
 
 type UseGameSocketProps = {
