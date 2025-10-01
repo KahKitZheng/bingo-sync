@@ -13,15 +13,12 @@ const Layout = (props: Readonly<LayoutProps>) => {
         <Link to="/" className="text-2xl font-bold">
           <h1 className="text-4xl font-bold text-indigo-500">Bingo</h1>
         </Link>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <Link to="/templates" className="text-center font-semibold">
             Templates
           </Link>
           <Link to="/game" className="text-center font-semibold">
             Game
-          </Link>
-          <Link to="/highscore" className="text-center font-semibold">
-            High scores
           </Link>
         </div>
       </header>
