@@ -1,54 +1,14 @@
 import type * as Party from "partykit/server";
 import type { BingoItem } from "../src/types/bingo";
-
-type Player = {
-  id: string;
-  name: string;
-  isReady: boolean;
-  isHost: boolean;
-  connection: Party.Connection;
-};
-
-type PlayerGameState = {
-  playerId: string;
-  playerName: string;
-  bingoItems: BingoItem[];
-  markedCells: number[];
-};
-
-type RoomState = {
-  roomCode: string;
-  roomName: string;
-  gridSize: number;
-  maxPlayers: number;
-  template: string;
-  templateItems: BingoItem[];
-  players: Map<string, Player>;
-  gameStarted: boolean;
-  playerGameStates: Map<string, PlayerGameState>;
-};
-
-type CreateRoomData = {
-  roomName?: string;
-  gridSize?: number;
-  playerName: string;
-  templateName?: string;
-  templateItems?: BingoItem[];
-};
-
-type JoinRoomData = {
-  playerName: string;
-};
-
-type ToggleReadyData = {
-  playerId: string;
-  isReady: boolean;
-};
-
-type MarkCellData = {
-  cellIndex: number;
-  marked: boolean;
-};
+import type {
+  ServerPlayer,
+  RoomState,
+  CreateRoomData,
+  JoinRoomData,
+  MarkCellData,
+  ToggleReadyData,
+} from "../src/types/game";
+import { checkWinningLines } from "../src/utils";
 
 export default class BingoServer implements Party.Server {
   options: Party.ServerOptions = {
@@ -131,7 +91,7 @@ export default class BingoServer implements Party.Server {
     this.state.templateItems = data.templateItems || this.generateBingoItems();
 
     // Add creator as first player and host
-    const player: Player = {
+    const player: ServerPlayer = {
       id: sender.id,
       name: data.playerName,
       isReady: false,
@@ -180,7 +140,7 @@ export default class BingoServer implements Party.Server {
     }
 
     // Add player
-    const player: Player = {
+    const player: ServerPlayer = {
       id: sender.id,
       name: data.playerName,
       isReady: false,
@@ -338,52 +298,6 @@ export default class BingoServer implements Party.Server {
     });
   }
 
-  checkWinningLines(markedIndices: number[], gridSize: number): number[][] {
-    const lines: number[][] = [];
-    const markedSet = new Set(markedIndices);
-
-    // Check rows
-    for (let row = 0; row < gridSize; row++) {
-      const rowIndices = Array.from(
-        { length: gridSize },
-        (_, col) => row * gridSize + col,
-      );
-      if (rowIndices.every((index) => markedSet.has(index))) {
-        lines.push(rowIndices);
-      }
-    }
-
-    // Check columns
-    for (let col = 0; col < gridSize; col++) {
-      const colIndices = Array.from(
-        { length: gridSize },
-        (_, row) => row * gridSize + col,
-      );
-      if (colIndices.every((index) => markedSet.has(index))) {
-        lines.push(colIndices);
-      }
-    }
-
-    // Check diagonals
-    const diagonal1 = Array.from(
-      { length: gridSize },
-      (_, i) => i * gridSize + i,
-    );
-    if (diagonal1.every((index) => markedSet.has(index))) {
-      lines.push(diagonal1);
-    }
-
-    const diagonal2 = Array.from(
-      { length: gridSize },
-      (_, i) => i * gridSize + (gridSize - 1 - i),
-    );
-    if (diagonal2.every((index) => markedSet.has(index))) {
-      lines.push(diagonal2);
-    }
-
-    return lines;
-  }
-
   handleEndGame(sender: Party.Connection) {
     const player = this.state.players.get(sender.id);
     if (!player?.isHost) {
@@ -404,7 +318,7 @@ export default class BingoServer implements Party.Server {
     }> = [];
 
     this.state.playerGameStates.forEach((playerState) => {
-      const lines = this.checkWinningLines(
+      const lines = checkWinningLines(
         playerState.markedCells,
         this.state.gridSize,
       );

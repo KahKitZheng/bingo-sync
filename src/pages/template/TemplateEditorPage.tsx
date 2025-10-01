@@ -5,9 +5,9 @@ import BingoCard from "../../components/BingoCard";
 import Select from "react-select";
 import { RefreshCcw, Trash2 } from "lucide-react";
 import { SupabaseContext } from "../../contexts/Supabase/SupabaseContext";
-import type { BingoItem, Template } from "../../types/bingo";
-import { randomId } from "../../utils";
+import { checkWinningLines, randomId } from "../../utils";
 import { useParams } from "react-router";
+import type { BingoItem, Template } from "../../types/bingo";
 
 const TemplateEditorPage = () => {
   const { supabase, templates } = useContext(SupabaseContext);
@@ -22,55 +22,6 @@ const TemplateEditorPage = () => {
   const [templateName, setTemplateName] = useState("");
 
   const [newItem, setNewItem] = useState("");
-
-  function checkWinningLines(
-    markedIndices: number[],
-    gridSize: number,
-  ): number[][] {
-    const lines: number[][] = [];
-    const markedSet = new Set(markedIndices);
-
-    // Check rows
-    for (let row = 0; row < gridSize; row++) {
-      const rowIndices = Array.from(
-        { length: gridSize },
-        (_, col) => row * gridSize + col,
-      );
-      if (rowIndices.every((index) => markedSet.has(index))) {
-        lines.push(rowIndices);
-      }
-    }
-
-    // Check columns
-    for (let col = 0; col < gridSize; col++) {
-      const colIndices = Array.from(
-        { length: gridSize },
-        (_, row) => row * gridSize + col,
-      );
-      if (colIndices.every((index) => markedSet.has(index))) {
-        lines.push(colIndices);
-      }
-    }
-
-    // Check diagonals
-    const diagonal1 = Array.from(
-      { length: gridSize },
-      (_, i) => i * gridSize + i,
-    );
-    if (diagonal1.every((index) => markedSet.has(index))) {
-      lines.push(diagonal1);
-    }
-
-    const diagonal2 = Array.from(
-      { length: gridSize },
-      (_, i) => i * gridSize + (gridSize - 1 - i),
-    );
-    if (diagonal2.every((index) => markedSet.has(index))) {
-      lines.push(diagonal2);
-    }
-
-    return lines;
-  }
 
   const generateBingoCard = useCallback(() => {
     const includedItems = items.filter((item) => item.included);

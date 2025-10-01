@@ -8,6 +8,14 @@ import GameHeader from "../../components/game/GameHeader";
 import PlayerCardSmall from "../../components/game/PlayerCardSmall";
 import { SupabaseContext } from "../../contexts/Supabase/SupabaseContext";
 import type { BingoItem } from "../../types/bingo";
+import type {
+  PendingAction,
+  RoomDetails,
+  Player,
+  PlayerGameState,
+  Winner,
+} from "../../types/game";
+import { checkWinningLines } from "../../utils";
 
 const host = import.meta.env.PROD
   ? "https://not-a-wordle.kahkitzheng.partykit.dev/"
@@ -21,47 +29,6 @@ const generateRoomCode = () => {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
-};
-
-type Player = {
-  id: string;
-  name: string;
-  isReady: boolean;
-  isHost: boolean;
-};
-
-type RoomDetails = {
-  roomCode: string;
-  roomName: string;
-  template: string;
-  gridSize: number;
-  maxPlayers: number;
-};
-
-type PlayerGameState = {
-  playerId: string;
-  playerName: string;
-  bingoItems: BingoItem[];
-  markedCells: Set<number>;
-};
-
-type Winner = {
-  playerId: string;
-  playerName: string;
-  linesCount: number;
-};
-
-type PendingAction = {
-  type: "create" | "join";
-  data: {
-    type: string;
-    roomName?: string;
-    gridSize?: number;
-    playerName: string;
-    templateName?: string;
-    templateItems?: BingoItem[];
-    timestamp: number;
-  };
 };
 
 const GamePage = () => {
@@ -118,55 +85,6 @@ const GamePage = () => {
       setSelectedTemplate(templates[0].id);
     }
   }, [templates, selectedTemplate]);
-
-  const checkWinningLines = useCallback(
-    (markedIndices: number[], gridSize: number): number[][] => {
-      const lines: number[][] = [];
-      const markedSet = new Set(markedIndices);
-
-      // Check rows
-      for (let row = 0; row < gridSize; row++) {
-        const rowIndices = Array.from(
-          { length: gridSize },
-          (_, col) => row * gridSize + col,
-        );
-        if (rowIndices.every((index) => markedSet.has(index))) {
-          lines.push(rowIndices);
-        }
-      }
-
-      // Check columns
-      for (let col = 0; col < gridSize; col++) {
-        const colIndices = Array.from(
-          { length: gridSize },
-          (_, row) => row * gridSize + col,
-        );
-        if (colIndices.every((index) => markedSet.has(index))) {
-          lines.push(colIndices);
-        }
-      }
-
-      // Check diagonals
-      const diagonal1 = Array.from(
-        { length: gridSize },
-        (_, i) => i * gridSize + i,
-      );
-      if (diagonal1.every((index) => markedSet.has(index))) {
-        lines.push(diagonal1);
-      }
-
-      const diagonal2 = Array.from(
-        { length: gridSize },
-        (_, i) => i * gridSize + (gridSize - 1 - i),
-      );
-      if (diagonal2.every((index) => markedSet.has(index))) {
-        lines.push(diagonal2);
-      }
-
-      return lines;
-    },
-    [],
-  );
 
   const socket = usePartySocket({
     host,
