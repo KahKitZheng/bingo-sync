@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "server:dev": "partykit dev",
-    "deploy": "npm run client:build && partykit deploy"
+    "deploy": "npm run build && partykit deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.1",
