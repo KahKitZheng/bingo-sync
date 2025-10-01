@@ -103,7 +103,6 @@ const TemplateEditorPage = () => {
 
   return (
     <Layout>
-      <button onClick={saveTemplate}>Save</button>
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2">
         <FormColumn
           title="Your bingo card"
@@ -225,7 +224,7 @@ const TemplateEditorPage = () => {
             <p className="mb-1 block text-sm font-medium">Add new bingo item</p>
             <div className="mb-4 flex gap-2">
               <input
-                className="w-full rounded border border-gray-200 p-2 placeholder:text-sm"
+                className="w-full rounded border border-gray-200 p-2 text-sm placeholder:text-sm"
                 type="text"
                 placeholder="Enter a bingo item"
                 value={newItem}
@@ -238,7 +237,7 @@ const TemplateEditorPage = () => {
                 onChange={(e) => setNewItem(e.target.value)}
               />
               <button
-                className="flex cursor-pointer items-center justify-center rounded border-gray-200 bg-indigo-400 px-4 text-2xl text-white transition hover:bg-indigo-500"
+                className="flex cursor-pointer items-center justify-center rounded border-gray-200 bg-indigo-200 px-4 text-2xl text-indigo-700 transition hover:bg-indigo-500"
                 onClick={addItem}
               >
                 +
@@ -268,6 +267,12 @@ const TemplateEditorPage = () => {
           </div>
         </FormColumn>
       </div>
+      <button
+        className="mt-4 w-full cursor-pointer rounded bg-indigo-200 py-2 font-bold text-indigo-700"
+        onClick={saveTemplate}
+      >
+        Save
+      </button>
     </Layout>
   );
 };
