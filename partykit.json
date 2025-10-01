@@ -1,5 +1,4 @@
 {
-  "$schema": "https://www.partykit.io/schema.json",
   "name": "bingo-sync-party",
   "main": "party/index.ts",
   "compatibilityDate": "2025-09-29",
